@@ -130,12 +130,10 @@ local function worldToViewport(...)
     return camera:WorldToViewportPoint(...)
 end
 local AllowedESPType = {
-    text = true,
+    boxadornment = true,
     sphereadornment = true,
     cylinderadornment = true,
-    adornment = true,
-    selectionbox = true,
-    highlight = true
+    selectionbox = true
 }
 local AllowedTracerFrom = {
     top = true,
@@ -154,14 +152,13 @@ local function TracerCreate(espSettings, instanceName)
     if not AllowedTracerFrom[espSettings.From] then
         espSettings.From = "bottom"
     end
-    local Path2D = InstancesLib.Create("Path2D", {
-        Parent = MainGUI,
-        Name = instanceName or "Tracer",
-        Closed = true,
-        Color3 = espSettings.Color,
-        Thickness = espSettings.Thickness,
-        Transparency = espSettings.Transparency
-    })
+    local tracer = DrawingNew("Line")
+    if tracer then
+        tracer.Visible = false
+        tracer.Color = espSettings.Color
+        tracer.Thickness = espSettings.Thickness
+        tracer.Transparency = 1 - espSettings.Transparency
+    end
     local data = {
         From = Vector2.new(0, 0),
         To = Vector2.new(0, 0),
@@ -170,39 +167,36 @@ local function TracerCreate(espSettings, instanceName)
         Thickness = espSettings.Thickness,
         Transparency = espSettings.Transparency
     }
-    local function UpdateTracer(from, to)
-        Path2D:SetControlPoints({
-            Path2DControlPoint.new(UDim2.fromOffset(from.X, from.Y)),
-            Path2DControlPoint.new(UDim2.fromOffset(to.X, to.Y))
-        })
-    end
-    UpdateTracer(data.From, data.To)
     local proxy = {}
     local Tracer = {
         __newindex = function(table, key, value)
-            if not Path2D then return end
+            if not tracer then return end
             if key == "From" then
                 data.From = value
-                UpdateTracer(data.From, data.To)
+                tracer.From = value
             elseif key == "To" then
                 data.To = value
-                UpdateTracer(data.From, data.To)
-            elseif key == "Transparency" or key == "Thickness" then
-                Path2D[key] = value
+                tracer.To = value
+            elseif key == "Transparency" then
+                data.Transparency = value
+                tracer.Transparency = 1 - value
+            elseif key == "Thickness" then
+                data.Thickness = value
+                tracer.Thickness = value
             elseif key == "Color3" then
-                Path2D.Color3 = value
+                data.Color3 = value
+                tracer.Color = value
             elseif key == "Visible" then
-                Path2D.Parent = value and MainGUI or StorageFolder
+                data.Visible = value
+                tracer.Visible = value
             end
-            data[key] = value
         end,
         __index = function(table, key)
-            if not Path2D then return nil end
+            if not tracer then return nil end
             if key == "Destroy" or key == "Delete" then
                 return function()
-                    Path2D:SetControlPoints({})
-                    Path2D:Destroy()
-                    Path2D = nil
+                    if tracer then tracer:Remove() end
+                    tracer = nil
                 end
             end
             return data[key]
@@ -253,6 +247,13 @@ function StarLightESP:Unload()
     StorageFolder:Destroy()
     MainGUI:Destroy()
     BillboardGUI:Destroy()
+    if DrawingNew then
+        for _, ESP in pairs(Cache) do
+            if ESP.Tracer then
+                ESP.Tracer:Destroy()
+            end
+        end
+    end
     getgenv().StarLightESP = nil
 end
 function StarLightESP:RemoveESP(model)
@@ -269,7 +270,7 @@ function StarLightESP:AddESP(espSettings)
     end
     assert(typeof(espSettings) == "table", "espSettings must be a table")
     assert(typeof(model) == "Instance", "espSettings.Model must be an Instance")
-    espSettings.ESPType = espSettings.ESPType or "highlight"
+    espSettings.ESPType = espSettings.ESPType or "selectionbox"
     espSettings.ESPType = string.lower(espSettings.ESPType)
     if not AllowedESPType[espSettings.ESPType] then
         error("Invalid ESP Type: " .. espSettings.ESPType)
@@ -279,11 +280,11 @@ function StarLightESP:AddESP(espSettings)
     espSettings.Visible = typeof(espSettings.Visible) == "boolean" and espSettings.Visible or true
     espSettings.Color = typeof(espSettings.Color) == "Color3" and espSettings.Color or Color3.new(1, 1, 1)
     espSettings.MaxDistance = typeof(espSettings.MaxDistance) == "number" and espSettings.MaxDistance or 5000
-    espSettings.StudsOffset = typeof(espSettings.StudsOffset) == "Vector3" and espSettings.StudsOffset or Vector3.new(0, 3, 0)
+    espSettings.StudsOffset = typeof(espSettings.StudsOffset) == "Vector3" and espSettings.StudsOffset or Vector3.new(0, 0, 0)
     espSettings.TextSize = typeof(espSettings.TextSize) == "number" and espSettings.TextSize or 23
     espSettings.Thickness = typeof(espSettings.Thickness) == "number" and espSettings.Thickness or 0.1
     espSettings.Transparency = typeof(espSettings.Transparency) == "number" and espSettings.Transparency or 0.65
-    espSettings.SurfaceColor = typeof(espSettings.SurfaceColor) == "Color3" and espSettings.SurfaceColor or Color3.new()
+    espSettings.SurfaceColor = typeof(espSettings.SurfaceColor) == "Color3" and espSettings.SurfaceColor or espSettings.Color
     espSettings.FillColor = typeof(espSettings.FillColor) == "Color3" and espSettings.FillColor or espSettings.Color
     espSettings.OutlineColor = typeof(espSettings.OutlineColor) == "Color3" and espSettings.OutlineColor or Color3.new(1, 1, 1)
     espSettings.FillTransparency = typeof(espSettings.FillTransparency) == "number" and espSettings.FillTransparency or 0.5
@@ -371,17 +372,8 @@ function StarLightESP:AddESP(espSettings)
             Color3 = espSettings.Color,
             LineThickness = espSettings.Thickness,
             SurfaceColor3 = espSettings.SurfaceColor,
-            SurfaceTransparency = espSettings.Transparency
-        })
-    elseif espSettings.ESPType == "highlight" then
-        Highlighter = InstancesLib.Create("Highlight", {
-            Parent = ActiveFolder,
-            Name = Index,
-            Adornee = model,
-            FillColor = espSettings.FillColor,
-            OutlineColor = espSettings.OutlineColor,
-            FillTransparency = espSettings.FillTransparency,
-            OutlineTransparency = espSettings.OutlineTransparency
+            SurfaceTransparency = espSettings.Transparency,
+            LineColor = espSettings.OutlineColor
         })
     end
     local Tracer = TracerCreate(espSettings.Tracer, Index)
@@ -524,23 +516,20 @@ local function Update()
         else
             if ESP.Arrow then ESP.Arrow.Visible = false end
         end
-        if ESP.Tracer and Library.GlobalConfig.Tracers and ESP.Settings.Tracer.Enabled then
-            ESP.Tracer.Visible = onScreen
-            if onScreen then
-                if ESP.Settings.Tracer.From == "mouse" then
-                    ESP.Tracer.From = Vector2.new(mousePos.X, mousePos.Y)
-                elseif ESP.Settings.Tracer.From == "top" then
-                    ESP.Tracer.From = Vector2.new(viewportSize.X / 2, 0)
-                elseif ESP.Settings.Tracer.From == "center" then
-                    ESP.Tracer.From = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
-                else
-                    ESP.Tracer.From = Vector2.new(viewportSize.X / 2, viewportSize.Y)
-                end
-                ESP.Tracer.To = Vector2.new(vector.X, vector.Y)
-                ESP.Tracer.Color3 = tracerColor
-                ESP.Tracer.Thickness = ESP.Settings.Tracer.Thickness
-                ESP.Tracer.Transparency = ESP.Settings.Tracer.Transparency
+        if ESP.Tracer and Library.GlobalConfig.Tracers and ESP.Settings.Tracer.Enabled and onScreen then
+            local fromPos
+            if ESP.Settings.Tracer.From == "mouse" then
+                fromPos = Vector2.new(mousePos.X, mousePos.Y)
+            elseif ESP.Settings.Tracer.From == "top" then
+                fromPos = Vector2.new(viewportSize.X / 2, 0)
+            elseif ESP.Settings.Tracer.From == "center" then
+                fromPos = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+            else
+                fromPos = Vector2.new(viewportSize.X / 2, viewportSize.Y)
             end
+            ESP.Tracer.From = fromPos
+            ESP.Tracer.To = Vector2.new(vector.X, vector.Y)
+            ESP.Tracer.Color3 = tracerColor
         else
             if ESP.Tracer then ESP.Tracer.Visible = false end
         end
@@ -567,16 +556,7 @@ local function Update()
         end
         if ESP.Highlight and Library.GlobalConfig.Highlighters then
             local showHighlight = onScreen
-            if ESP.Settings.ESPType == "highlight" then
-                ESP.Highlight.Parent = showHighlight and ActiveFolder or StorageFolder
-                ESP.Highlight.Adornee = showHighlight and ESP.Model or nil
-                if showHighlight then
-                    ESP.Highlight.FillColor = Library.GlobalConfig.Rainbow and Library.RainbowColor or ESP.Settings.FillColor
-                    ESP.Highlight.OutlineColor = Library.GlobalConfig.Rainbow and Library.RainbowColor or ESP.Settings.OutlineColor
-                    ESP.Highlight.FillTransparency = ESP.Settings.FillTransparency
-                    ESP.Highlight.OutlineTransparency = ESP.Settings.OutlineTransparency
-                end
-            elseif ESP.Settings.ESPType == "selectionbox" then
+            if ESP.Settings.ESPType == "selectionbox" then
                 ESP.Highlight.Parent = showHighlight and ActiveFolder or StorageFolder
                 ESP.Highlight.Adornee = showHighlight and ESP.Model or nil
                 if showHighlight then
@@ -584,6 +564,7 @@ local function Update()
                     ESP.Highlight.LineThickness = ESP.Settings.Thickness
                     ESP.Highlight.SurfaceColor3 = ESP.Settings.SurfaceColor
                     ESP.Highlight.SurfaceTransparency = ESP.Settings.Transparency
+                    ESP.Highlight.LineColor = ESP.Settings.OutlineColor
                 end
             else
                 ESP.Highlight.Parent = showHighlight and ActiveFolder or StorageFolder
