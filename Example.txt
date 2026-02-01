@@ -1,0 +1,3 @@
+local StarLightESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/StarMoon-SL/StarLight-ESP-Library/refs/heads/main/StarLight.ESP.luau"))()
+
+local Library = getgenv().StarLightESP
