@@ -1,907 +1,834 @@
-local StarLightESP = {}
-local Cache = {}
+local StarLight_ESPLibrary = {
+	ObjectsFolder = Instance.new("Folder"),
+	ScreenGui = Instance.new("ScreenGui"),
+	HighlightsFolder = Instance.new("Folder"),
+	BillboardsFolder = Instance.new("Folder"),
+	TracersFrame = Instance.new("Frame"),
+	ArrowsFrame = Instance.new("Frame"),
+	AdornmentsFolder = Instance.new("Folder"),
+	Highlights = {},
+	Labels = {},
+	Elements = {},
+	ElementsEnabled = {},
+	Frames = {},
+	TotalObjects = {},
+	TransparencyEnabled = {},
+	Connections = {},
+	Billboards = {},
+	ColorTable = {},
+	TextTable = {},
+	Lines = {},
+	ArrowsTable = {},
+	Font = Enum.Font.RobotoCondensed,
+	ConnectionsTable = {},
+	Objects = {},
+	ConnectionsManager = {},
+	TracerTable = {},
+	HighlightedObjects = {},
+	Adornments = {},
+	Rainbow = false,
+	Tracers = false,
+	Unloaded = false,
+	ShowDistance = false,
+	MatchColors = true,
+	Arrows = false,
+	TextTransparency = 0,
+	TracerOrigin = "Bottom",
+	FillTransparency = 0.75,
+	OutlineTransparency = 0,
+	TextOffset = 0,
+	TextOutlineTransparency = 0,
+	FadeTime = 0,
+	TracerSize = 0.5,
+	ArrowRadius = 200,
+	TextSize = 20,
+	DistanceSizeRatio = 1,
+	OutlineColor = Color3.fromRGB(255,255,255),
+	RainbowColor = Color3.fromRGB(255,255,255),
+	ESPType = "Highlight",
+	Thickness = 0.1,
+	Transparency = 0.65,
+}
+local RainbowTable = {
+	HueSetup = 0,
+	Hue = 0,
+	Step = 0,
+	Color = Color3.new(),
+	Enabled = false,
+}
 
-local function GetServices()
-    local Services = {}
-    setmetatable(Services, {
-        __index = function(self, ServiceName)
-            local Service = game:GetService(ServiceName)
-            if cloneref then Service = cloneref(Service) end
-            return Service
-        end
-    })
-    return Services
+function StarLight_ESPLibrary:GenerateRandomString()
+	local FinishedString = {}
+	local CharacterList = [==[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890]==]
+	local function GenerateSegment()
+		local RandomIndex = math.random(1,#CharacterList)
+		local Character = CharacterList:sub(RandomIndex,RandomIndex)
+		return Character
+	end
+	for i = 1,24,1 do
+		local NewCharacter = GenerateSegment()
+		table.insert(FinishedString, NewCharacter)
+	end
+	return table.concat(FinishedString)
 end
 
-local Services = GetServices()
-local Players = Services.Players
-local RunService = Services.RunService
-local Workspace = Services.Workspace
-local UserInputService = Services.UserInputService
-local CoreGui = Services.CoreGui
+local CloneReference = (cloneref and cloneref or function(Object) return Object end)
+local Players = CloneReference(game:GetService("Players"))
+local CoreGui = (getgenv and CloneReference(game:GetService("CoreGui")) or Players.LocalPlayer.PlayerGui)
+local function GetHiddenUI()
+	if gethui then
+		return gethui()
+	end
+	local HiddenUI = Instance.new("Folder", CoreGui)
+	HiddenUI.Name = StarLight_ESPLibrary:GenerateRandomString()
+	return HiddenUI
+end
 
+local Workspace = CloneReference(workspace)
+local HttpService = CloneReference(game:GetService("HttpService"))
+local UserInputService = CloneReference(game:GetService("UserInputService"))
+local RunService = CloneReference(game:GetService("RunService"))
+local TweenService = CloneReference(game:GetService("TweenService"))
+local Debris = CloneReference(game:GetService("Debris"))
 local LocalPlayer = Players.LocalPlayer
+local ObjectsFolder = StarLight_ESPLibrary.ObjectsFolder
+local HighlightedObjects = StarLight_ESPLibrary.HighlightedObjects
+local Highlights = StarLight_ESPLibrary.Highlights
+local ConnectionsTable = StarLight_ESPLibrary.ConnectionsTable
+local Objects = StarLight_ESPLibrary.Objects
+local TotalObjects = StarLight_ESPLibrary.TotalObjects
+local Billboards = StarLight_ESPLibrary.Billboards
+local Frames = StarLight_ESPLibrary.Frames
+local ScreenGui = StarLight_ESPLibrary.ScreenGui
+local ArrowsTable = StarLight_ESPLibrary.ArrowsTable
+local HighlightsFolder = StarLight_ESPLibrary.HighlightsFolder
+local Labels = StarLight_ESPLibrary.Labels
+local Connections = StarLight_ESPLibrary.Connections
+local Elements = StarLight_ESPLibrary.Elements
+local TextTable = StarLight_ESPLibrary.TextTable
+local HiddenUI = GetHiddenUI()
+local ColorTable = StarLight_ESPLibrary.ColorTable
 local Camera = Workspace.CurrentCamera
+local Mouse = CloneReference(LocalPlayer:GetMouse())
+local TracersFrame = StarLight_ESPLibrary.TracersFrame
+local ArrowsFrame = StarLight_ESPLibrary.ArrowsFrame
+local AdornmentsFolder = StarLight_ESPLibrary.AdornmentsFolder
 
-local function RandomString(length)
-    length = length or math.random(10, 20)
-    local array = {}
-    for i = 1, length do
-        array[i] = string.char(math.random(33, 126))
-    end
-    return table.concat(array)
+ScreenGui.Parent = HiddenUI
+HighlightsFolder.Parent = ScreenGui
+BillboardsFolder = StarLight_ESPLibrary.BillboardsFolder
+BillboardsFolder.Parent = ScreenGui
+AdornmentsFolder.Parent = ScreenGui
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+TracersFrame.Size = UDim2.new(1,0,1,0)
+TracersFrame.BackgroundTransparency = 1
+TracersFrame.Parent = ScreenGui
+ArrowsFrame.Size = UDim2.new(1,0,1,0)
+ArrowsFrame.BackgroundTransparency = 1
+ArrowsFrame.Parent = ScreenGui
+TracersFrame.Visible = false
+ArrowsFrame.Visible = false
+local ArrowTemplate = Instance.new("ImageLabel")
+ArrowTemplate.Image = "http://www.roblox.com/asset/?id=16368985219"
+ArrowTemplate.Size = UDim2.new(0, 50,0, 50)
+ArrowTemplate.AnchorPoint = Vector2.new(0.5, 0.5)
+ArrowTemplate.BackgroundTransparency = 1
+ArrowTemplate.ImageTransparency = 1
+local Constraint = Instance.new("UIAspectRatioConstraint")
+Constraint.Parent = ArrowTemplate
+Constraint.AspectRatio = 1
+Constraint.Name = "Constraint"
+
+local function FindPrimaryPart(instance)
+	if typeof(instance) ~= "Instance" then
+		return nil
+	end
+	return (instance:IsA("Model") and instance.PrimaryPart or nil)
+		or instance:FindFirstChildWhichIsA("BasePart")
+		or instance:FindFirstChildWhichIsA("UnionOperation")
+		or instance
+end
+
+local function TryGetProperty(instance, propertyName)
+	local success, property = pcall(function()
+		return instance[propertyName]
+	end)
+	return if success then property else nil
 end
 
 local function GetPivot(Instance)
-    if Instance.ClassName == "Bone" then
-        return Instance.TransformedWorldCFrame
-    elseif Instance.ClassName == "Attachment" then
-        return Instance.WorldCFrame
-    elseif Instance.ClassName == "Camera" then
-        return Instance.CFrame
-    else
-        return Instance:GetPivot()
-    end
+	if Instance.ClassName == "Bone" then
+		return Instance.TransformedWorldCFrame
+	elseif Instance.ClassName == "Attachment" then
+		return Instance.WorldCFrame
+	elseif Instance.ClassName == "Camera" then
+		return Instance.CFrame
+	else
+		return Instance:GetPivot()
+	end
 end
 
-local function FindPrimaryPart(Instance)
-    if typeof(Instance) ~= "Instance" then return nil end
-    return (Instance:IsA("Model") and Instance.PrimaryPart or nil)
-        or Instance:FindFirstChildWhichIsA("BasePart")
-        or Instance:FindFirstChildWhichIsA("UnionOperation")
-        or Instance
+if StarLight_ESPLibrary.Unloaded == true then return end
+
+function StarLight_ESPLibrary:AddESP(Parameters)
+	local Object = Parameters.Object
+	if StarLight_ESPLibrary.ElementsEnabled[Object] == true or StarLight_ESPLibrary.Unloaded == true then return end
+	if not Object:IsA("BasePart") and not Object:IsA("Model") then
+		return
+	end
+
+	local ESPType = Parameters.ESPType or "Highlight"
+	local IsAdornment = ESPType == "SphereAdornment" or ESPType == "Adornment" or ESPType == "BoxHandleAdornment"
+
+	StarLight_ESPLibrary.TransparencyEnabled[Object] = false
+
+	if Highlights[Object] then
+		Highlights[Object]:Destroy()
+		Highlights[Object] = nil
+	end
+
+	if StarLight_ESPLibrary.Adornments[Object] then
+		StarLight_ESPLibrary.Adornments[Object]:Destroy()
+		StarLight_ESPLibrary.Adornments[Object] = nil
+	end
+
+	local MainPart = nil
+	if Parameters.BasePart then
+		MainPart = Parameters.BasePart
+	end
+
+	local Highlighter = nil
+	local ModelSize = nil
+
+	if IsAdornment then
+		if Object:IsA("Model") then
+			_, ModelSize = Object:GetBoundingBox()
+		else
+			if not TryGetProperty(Object, "Size") then
+				local prim = FindPrimaryPart(Object)
+				if not TryGetProperty(prim, "Size") then
+					ESPType = "Highlight"
+					IsAdornment = false
+				else
+					ModelSize = prim.Size
+				end
+			else
+				ModelSize = Object.Size
+			end
+		end
+	end
+
+	if IsAdornment and ESPType == "SphereAdornment" then
+		Highlighter = Instance.new("SphereHandleAdornment")
+		Highlighter.Parent = AdornmentsFolder
+		Highlighter.Name = StarLight_ESPLibrary:GenerateRandomString()
+		Highlighter.Adornee = Object
+		Highlighter.AlwaysOnTop = true
+		Highlighter.ZIndex = 10
+		Highlighter.Radius = ModelSize.X * 1.085
+		Highlighter.CFrame = CFrame.new() * CFrame.Angles(math.rad(90), 0, 0)
+		Highlighter.Color3 = Parameters.Color or Color3.new()
+		Highlighter.Transparency = Parameters.Transparency or StarLight_ESPLibrary.Transparency
+		StarLight_ESPLibrary.Adornments[Object] = Highlighter
+	elseif IsAdornment and (ESPType == "Adornment" or ESPType == "BoxHandleAdornment") then
+		Highlighter = Instance.new("BoxHandleAdornment")
+		Highlighter.Parent = AdornmentsFolder
+		Highlighter.Name = StarLight_ESPLibrary:GenerateRandomString()
+		Highlighter.Adornee = Object
+		Highlighter.AlwaysOnTop = true
+		Highlighter.ZIndex = 10
+		Highlighter.Size = ModelSize or Vector3.new(5,5,5)
+		Highlighter.Color3 = Parameters.Color or Color3.new()
+		Highlighter.Transparency = Parameters.Transparency or StarLight_ESPLibrary.Transparency
+		StarLight_ESPLibrary.Adornments[Object] = Highlighter
+	else
+		Highlighter = Instance.new("Highlight")
+		Highlighter.FillTransparency = 1
+		Highlighter.OutlineTransparency = 1
+		Highlighter.Name = StarLight_ESPLibrary:GenerateRandomString()
+		Highlighter.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		Highlighter.Parent = HighlightsFolder
+		Highlighter.Adornee = Object
+		Highlights[Object] = Highlighter
+	end
+
+	local ObjectTable = {Object}
+	TextTable[Object] = Parameters.Text
+
+	local TextFrame = Instance.new("Frame")
+	TextFrame.Visible = false
+	TextFrame.Name = StarLight_ESPLibrary:GenerateRandomString()
+	TextFrame.Size = UDim2.fromScale(1,1)
+	TextFrame.Parent = BillboardsFolder
+	TextFrame.BackgroundTransparency = 1
+	TextFrame.AnchorPoint = Vector2.new(0.5,0.5)
+
+	local TextLabel = Instance.new("TextLabel")
+	TextLabel.Name = StarLight_ESPLibrary:GenerateRandomString()
+	TextLabel.BackgroundTransparency = 1
+	TextLabel.Text = Parameters.Text
+	TextLabel.TextTransparency = 1
+	TextLabel.TextStrokeTransparency = StarLight_ESPLibrary.TextOutlineTransparency
+	TextLabel.Size = UDim2.new(1,0,1,0)
+	TextLabel.Font = StarLight_ESPLibrary.Font
+	TextLabel.TextSize = StarLight_ESPLibrary.TextSize
+	TextLabel.RichText = true
+	TextLabel.Parent = TextFrame
+	TextLabel.TextColor3 = Parameters.Color
+	Labels[Object] = TextLabel
+	Objects[Object] = ObjectTable
+	StarLight_ESPLibrary.ElementsEnabled[Object] = true
+	Labels[Object] = TextLabel
+
+	if Highlighter then
+		if IsAdornment then
+			TweenService:Create(Highlighter, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {Transparency = StarLight_ESPLibrary.Transparency}):Play()
+		else
+			TweenService:Create(Highlighter, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {FillTransparency = StarLight_ESPLibrary.FillTransparency}):Play()
+			TweenService:Create(Highlighter, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {OutlineTransparency = StarLight_ESPLibrary.OutlineTransparency}):Play()
+		end
+	end
+
+	Frames[Object] = TextFrame
+	Labels[Object] = TextLabel
+	Objects[Object] = Object
+	ColorTable[Object] = Parameters.Color 
+
+	local LineFrame = Instance.new("Frame")
+	LineFrame.Size = UDim2.new(0,0,0,0)
+	LineFrame.BackgroundTransparency = 1
+	LineFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	LineFrame.Parent = TracersFrame
+	LineFrame.Name = StarLight_ESPLibrary:GenerateRandomString()
+
+	local Stroke = Instance.new("UIStroke")
+	Stroke.Thickness = StarLight_ESPLibrary.TracerSize
+	Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	Stroke.Parent = LineFrame
+	Stroke.Transparency = 1
+	Stroke.Name = StarLight_ESPLibrary:GenerateRandomString()
+
+	TweenService:Create(LineFrame, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {BackgroundTransparency = 0}):Play()
+	TweenService:Create(Stroke, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {Transparency = 0}):Play()
+	StarLight_ESPLibrary.Lines[Object] = {LineFrame, Stroke}
+
+	if TextLabel then
+		local Tween = TweenService:Create(TextLabel, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {TextTransparency = StarLight_ESPLibrary.TextTransparency})
+		Tween:Play()
+		TweenService:Create(TextLabel, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {TextStrokeTransparency = StarLight_ESPLibrary.TextOutlineTransparency}):Play()
+		local TweenConnection = Tween.Completed:Once(function()
+			StarLight_ESPLibrary.TransparencyEnabled[Object] = true
+		end)
+	end
+
+	table.insert(Elements, TextFrame)
+	table.insert(TotalObjects, Object)
+
+	local Destroying1 = Object:GetPropertyChangedSignal("Parent"):Once(function()
+		StarLight_ESPLibrary:RemoveESP(Object)
+	end)
+	if Object.Parent ~= nil then
+		local Destroying2 = Object.Parent:GetPropertyChangedSignal("Parent"):Once(function()
+			StarLight_ESPLibrary:RemoveESP(Object)
+		end)
+	end
+	if Object:IsA("Model") and Object.PrimaryPart then
+		local Destroying3 = Object.PrimaryPart:GetPropertyChangedSignal("Parent"):Once(function()
+			StarLight_ESPLibrary:RemoveESP(Object)
+		end)
+	end
+
+	task.spawn(function()
+		local function Render()
+			local Position
+			Position = GetPivot(Object).Position
+			if Position then
+				local ScreenPoint, OnScreen = Camera:WorldToViewportPoint(Position)
+				local Frame = Frames[Object]
+				local Label = Labels[Object]
+				local HighlightInst = Highlights[Object]
+				local AdornmentInst = StarLight_ESPLibrary.Adornments[Object]
+
+				if StarLight_ESPLibrary.Lines[Object][1] then
+					StarLight_ESPLibrary.Lines[Object][1].Visible = (OnScreen)
+				end
+				if Frame then Frame.Visible = OnScreen end
+
+				if not OnScreen then
+					if HighlightInst then 
+						HighlightInst:Destroy() 
+						Highlights[Object] = nil 
+						HighlightInst = nil 
+					end
+					if AdornmentInst then
+						AdornmentInst:Destroy()
+						StarLight_ESPLibrary.Adornments[Object] = nil
+						AdornmentInst = nil
+					end
+				elseif Frame then
+					Frame.Position = UDim2.new(0, ScreenPoint.X, 0, ScreenPoint.Y)
+				end
+
+				if StarLight_ESPLibrary.ElementsEnabled[Object] == true and OnScreen then
+					if not HighlightInst and not AdornmentInst and not IsAdornment then
+						HighlightInst = Instance.new("Highlight")
+						HighlightInst.FillTransparency = 1
+						HighlightInst.OutlineTransparency = 1
+						HighlightInst.Name = StarLight_ESPLibrary:GenerateRandomString()
+						HighlightInst.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+						HighlightInst.Parent = HighlightsFolder
+						HighlightInst.Adornee = Object
+						Highlights[Object] = HighlightInst
+					elseif IsAdornment and not AdornmentInst and OnScreen then
+						if ESPType == "SphereAdornment" then
+							AdornmentInst = Instance.new("SphereHandleAdornment")
+							AdornmentInst.Radius = ModelSize.X * 1.085
+							AdornmentInst.CFrame = CFrame.new() * CFrame.Angles(math.rad(90), 0, 0)
+						else
+							AdornmentInst = Instance.new("BoxHandleAdornment")
+							AdornmentInst.Size = ModelSize or Vector3.new(5,5,5)
+						end
+						AdornmentInst.Parent = AdornmentsFolder
+						AdornmentInst.Name = StarLight_ESPLibrary:GenerateRandomString()
+						AdornmentInst.Adornee = Object
+						AdornmentInst.AlwaysOnTop = true
+						AdornmentInst.ZIndex = 10
+						AdornmentInst.Color3 = ColorTable[Object] or Color3.new()
+						AdornmentInst.Transparency = StarLight_ESPLibrary.Transparency
+						StarLight_ESPLibrary.Adornments[Object] = AdornmentInst
+					end
+				end
+
+				if Label then
+					Label.TextColor3 = StarLight_ESPLibrary.Rainbow and RainbowTable.Color or ColorTable[Object] or Color3.fromRGB(255,255,255)
+				end
+
+				local distance = math.floor((Camera.CFrame.Position - Position).Magnitude)
+				local distanceText = StarLight_ESPLibrary.ShowDistance and ("\n" .. '<font size="' .. math.round(StarLight_ESPLibrary.TextSize * StarLight_ESPLibrary.DistanceSizeRatio) .. '">[' .. distance .. ']</font>') or ""
+
+				if Label then
+					Label.Text = TextTable[Object] .. distanceText
+				end
+
+				if HighlightInst and not IsAdornment then
+					HighlightInst.Enabled = true
+					HighlightInst.FillColor = StarLight_ESPLibrary.Rainbow and RainbowTable.Color or ColorTable[Object] or Color3.fromRGB(255,255,255)
+					HighlightInst.OutlineColor = StarLight_ESPLibrary.MatchColors and HighlightInst.FillColor or StarLight_ESPLibrary.OutlineColor
+					if StarLight_ESPLibrary.TransparencyEnabled[Object] == true then
+						HighlightInst.FillTransparency = StarLight_ESPLibrary.FillTransparency
+						HighlightInst.OutlineTransparency = StarLight_ESPLibrary.OutlineTransparency
+						Label.TextTransparency = StarLight_ESPLibrary.TextTransparency
+						Label.TextStrokeTransparency = StarLight_ESPLibrary.TextOutlineTransparency
+					end
+				elseif AdornmentInst and IsAdornment then
+					AdornmentInst.Color3 = StarLight_ESPLibrary.Rainbow and RainbowTable.Color or ColorTable[Object] or Color3.new()
+					if StarLight_ESPLibrary.TransparencyEnabled[Object] == true then
+						AdornmentInst.Transparency = StarLight_ESPLibrary.Transparency
+						Label.TextTransparency = StarLight_ESPLibrary.TextTransparency
+						Label.TextStrokeTransparency = StarLight_ESPLibrary.TextOutlineTransparency
+					end
+				end
+
+				local LineFrame = StarLight_ESPLibrary.Lines[Object][1]
+				local Stroke = StarLight_ESPLibrary.Lines[Object][2]
+				local Origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y * 1)
+
+				if LineFrame and (HighlightInst or AdornmentInst) and StarLight_ESPLibrary.Tracers == true and OnScreen then
+					if StarLight_ESPLibrary.TracerOrigin == "Center" then
+						local MousePos = UserInputService:GetMouseLocation()
+						Origin = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+					elseif StarLight_ESPLibrary.TracerOrigin == "Top" then
+						Origin = Vector2.new(Camera.ViewportSize.X/2, 0)	
+					elseif StarLight_ESPLibrary.TracerOrigin == "Mouse" then
+						Origin = Vector2.new(LocalPlayer:GetMouse().X, UserInputService:GetMouseLocation().Y)
+					end
+
+					local Destination = Vector2.new(ScreenPoint.X, ScreenPoint.Y)
+					local Position = (Origin + Destination) / 2
+					local Rotation = math.deg(math.atan2(Destination.Y - Origin.Y, Destination.X - Origin.X))
+					local Length = (Origin - Destination).Magnitude
+
+					LineFrame.Position = UDim2.new(0, Position.X, 0, Position.Y)
+					LineFrame.Size = UDim2.new(0, Length, 0, 1)
+					LineFrame.Rotation = Rotation
+					LineFrame.BorderSizePixel = 0
+
+					if HighlightInst and not IsAdornment then
+						LineFrame.BackgroundColor3 = HighlightInst.FillColor
+						Stroke.Color = HighlightInst.FillColor
+					elseif AdornmentInst and IsAdornment then
+						LineFrame.BackgroundColor3 = AdornmentInst.Color3
+						Stroke.Color = AdornmentInst.Color3
+					end
+
+					Stroke.Thickness = StarLight_ESPLibrary.TracerSize
+					LineFrame.Visible = true
+				end
+
+				local function GetArrowData(objPos)
+					local ScreenSize = Camera.ViewportSize
+					local ScreenCenter = Vector2.new(ScreenSize.X / 2, ScreenSize.Y / 2)
+					local ToObj = (objPos - Camera.CFrame.Position).Unit
+					local CamForward = Camera.CFrame.LookVector
+					local Dir = Vector2.new(ScreenPoint.X, ScreenPoint.Y) - ScreenCenter
+					local Dot = CamForward:Dot(ToObj)
+					if Dot < 0 then
+						Dir = -Dir
+					end
+					local Angle = math.atan2(Dir.Y, Dir.X)
+					local radius = math.min(ScreenSize.X, ScreenSize.Y) / 2 - (400 - StarLight_ESPLibrary.ArrowRadius)
+					local ArrowPos = ScreenCenter + Dir.Unit * radius
+					return ArrowPos, math.deg(Angle)
+				end
+
+				if Object and StarLight_ESPLibrary.Arrows == true then
+					local Arrow = ArrowsTable[Object] or nil
+					if Arrow == nil and StarLight_ESPLibrary.ElementsEnabled[Object] == true then
+						Arrow = ArrowTemplate:Clone()
+						Arrow.Parent = ArrowsFrame
+						Arrow.Name = StarLight_ESPLibrary:GenerateRandomString()
+						Arrow:WaitForChild("Constraint").Name = StarLight_ESPLibrary:GenerateRandomString()
+						ArrowsTable[Object] = Arrow
+						TweenService:Create(Arrow, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {ImageTransparency = 0}):Play()
+					elseif StarLight_ESPLibrary.ElementsEnabled[Object] == true then
+						if OnScreen and ScreenPoint.Z > 0 then
+							ArrowsTable[Object].Visible = false
+						else
+							local arrowPos, angle = GetArrowData(GetPivot(Object).Position)
+							ArrowsTable[Object].Position = UDim2.new(0, arrowPos.X, 0, arrowPos.Y)
+							ArrowsTable[Object].Rotation = angle - 90
+							ArrowsTable[Object].Visible = true
+							ArrowsTable[Object].ImageColor3 = (StarLight_ESPLibrary.Rainbow == true and StarLight_ESPLibrary.RainbowColor or ColorTable[Object])
+						end
+					end
+				end
+			end
+		end
+
+		local Connection = RunService.PreRender:Connect(function()
+			Render()
+		end)
+		ConnectionsTable[Object] = Connection
+	end)
 end
 
-local function GetTracerOrigin(OriginType)
-    if OriginType == 2 then
-        return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-    elseif OriginType == 3 then
-        return Vector2.new(Camera.ViewportSize.X / 2, 0)
-    elseif OriginType == 4 then
-        return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    elseif OriginType == 5 then
-        return UserInputService:GetMouseLocation()
-    elseif OriginType == 1 and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local Position = Camera:WorldToViewportPoint(LocalPlayer.Character.HumanoidRootPart.Position)
-        return Vector2.new(Position.X, Position.Y)
-    else
-        return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-    end
+function StarLight_ESPLibrary:SetColorTable(Name, Color)
+	ColorTable[Name] = Color
 end
 
-local RainbowHue = 0
-local RainbowColor = Color3.fromHSV(0, 0.8, 1)
-
-local Library = {
-    Settings = {
-        Enabled = true,
-        Rainbow = false,
-        MaxDistance = 2000,
-        TextSize = 13,
-        RefreshRate = 0.016,
-        Box = {
-            Enabled = true,
-            Style = 1,
-            Thickness = 1,
-            Filled = {Enabled = false, Transparency = 0.5},
-            Color = Color3.new(1, 1, 1)
-        },
-        Tracer = {
-            Enabled = true,
-            Thickness = 1,
-            Origin = 2,
-            Color = Color3.new(1, 1, 1)
-        },
-        Arrow = {
-            Enabled = true,
-            Color = Color3.new(1, 1, 1),
-            CenterOffset = 300
-        },
-        Dot = {
-            Enabled = true,
-            Size = 4,
-            Color = Color3.new(1, 1, 1),
-            Filled = true
-        },
-        HealthBar = {
-            Enabled = true,
-            Position = 1,
-            Color = Color3.new(0, 1, 0),
-            OutlineColor = Color3.new(0, 0, 0)
-        },
-        Name = {
-            Enabled = true,
-            Color = Color3.new(1, 1, 1)
-        },
-        Distance = {
-            Enabled = true,
-            Color = Color3.new(0.8, 0.8, 0.8)
-        },
-        Skeleton = {
-            Enabled = false,
-            Thickness = 1,
-            Color = Color3.new(1, 1, 1)
-        },
-        Chams = {
-            Enabled = true,
-            Type = "Highlight",
-            FillColor = Color3.new(1, 0, 0),
-            OutlineColor = Color3.new(1, 1, 1),
-            FillTransparency = 0.65,
-            OutlineTransparency = 0
-        },
-        Radar = {
-            Enabled = true,
-            Position = Vector2.new(150, 150),
-            Radius = 100,
-            Scale = 1,
-            Color = Color3.new(1, 1, 1)
-        }
-    },
-    Drawings = {ESP = {}, Skeleton = {}, RadarObjects = {}},
-    Highlights = {},
-    Arrows = {},
-    ChamsObjects = {},
-    _connections = {}
-}
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = RandomString()
-ScreenGui.Parent = CoreGui
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 999999
-
-local function GetColor(BaseColor)
-    if Library.Settings.Rainbow then
-        return RainbowColor
-    end
-    return BaseColor
+function StarLight_ESPLibrary:SetFadeTime(Number)
+	StarLight_ESPLibrary.FadeTime = Number
 end
 
-local PlayerESP = {}
-PlayerESP.__index = PlayerESP
-
-function PlayerESP.CreateESP(Player)
-    local Box = {
-        TopLeft = Drawing.new("Line"),
-        TopRight = Drawing.new("Line"),
-        BottomLeft = Drawing.new("Line"),
-        BottomRight = Drawing.new("Line"),
-        Left = Drawing.new("Line"),
-        Right = Drawing.new("Line"),
-        Top = Drawing.new("Line"),
-        Bottom = Drawing.new("Line")
-    }
-    for _, Line in pairs(Box) do
-        Line.Visible = false
-        Line.Color = Library.Settings.Box.Color
-        Line.Thickness = Library.Settings.Box.Thickness
-    end
-    
-    local Tracer = Drawing.new("Line")
-    Tracer.Visible = false
-    Tracer.Thickness = Library.Settings.Tracer.Thickness
-    Tracer.Color = Library.Settings.Tracer.Color
-    
-    local Dot = Drawing.new("Circle")
-    Dot.Visible = false
-    Dot.Radius = Library.Settings.Dot.Size
-    Dot.Color = Library.Settings.Dot.Color
-    Dot.Filled = Library.Settings.Dot.Filled
-    Dot.Thickness = 1
-    
-    local Arrow = Instance.new("ImageLabel")
-    Arrow.Name = RandomString()
-    Arrow.Parent = ScreenGui
-    Arrow.Size = UDim2.new(0, 48, 0, 48)
-    Arrow.SizeConstraint = Enum.SizeConstraint.RelativeYY
-    Arrow.AnchorPoint = Vector2.new(0.5, 0.5)
-    Arrow.BackgroundTransparency = 1
-    Arrow.BorderSizePixel = 0
-    Arrow.Image = "http://www.roblox.com/asset/?id=16368985219"
-    Arrow.ImageColor3 = Library.Settings.Arrow.Color
-    Arrow.Visible = false
-    
-    local HealthBar = {
-        Outline = Drawing.new("Square"),
-        Fill = Drawing.new("Square")
-    }
-    HealthBar.Outline.Visible = false
-    HealthBar.Outline.Filled = false
-    HealthBar.Outline.Thickness = 1
-    HealthBar.Outline.Color = Library.Settings.HealthBar.OutlineColor
-    HealthBar.Fill.Visible = false
-    HealthBar.Fill.Filled = true
-    
-    local Info = {
-        Name = Drawing.new("Text"),
-        Distance = Drawing.new("Text")
-    }
-    for _, Text in pairs(Info) do
-        Text.Visible = false
-        Text.Center = true
-        Text.Size = Library.Settings.TextSize
-        Text.Color = Library.Settings.Name.Color
-        Text.Font = 2
-        Text.Outline = true
-    end
-    Info.Distance.Color = Library.Settings.Distance.Color
-    
-    local Skeleton = {
-        Head = Drawing.new("Line"),
-        Neck = Drawing.new("Line"),
-        UpperSpine = Drawing.new("Line"),
-        LowerSpine = Drawing.new("Line"),
-        LeftShoulder = Drawing.new("Line"),
-        LeftUpperArm = Drawing.new("Line"),
-        LeftLowerArm = Drawing.new("Line"),
-        LeftHand = Drawing.new("Line"),
-        RightShoulder = Drawing.new("Line"),
-        RightUpperArm = Drawing.new("Line"),
-        RightLowerArm = Drawing.new("Line"),
-        RightHand = Drawing.new("Line"),
-        LeftHip = Drawing.new("Line"),
-        LeftUpperLeg = Drawing.new("Line"),
-        LeftLowerLeg = Drawing.new("Line"),
-        LeftFoot = Drawing.new("Line"),
-        RightHip = Drawing.new("Line"),
-        RightUpperLeg = Drawing.new("Line"),
-        RightLowerLeg = Drawing.new("Line"),
-        RightFoot = Drawing.new("Line")
-    }
-    for _, Bone in pairs(Skeleton) do
-        Bone.Visible = false
-        Bone.Color = Library.Settings.Skeleton.Color
-        Bone.Thickness = Library.Settings.Skeleton.Thickness
-    end
-    
-    Library.Drawings.ESP[Player] = {
-        Box = Box,
-        Tracer = Tracer,
-        Dot = Dot,
-        HealthBar = HealthBar,
-        Info = Info,
-        Fills = {}
-    }
-    Library.Drawings.Skeleton[Player] = Skeleton
-    Library.Arrows[Player] = Arrow
+function StarLight_ESPLibrary:SetTextTransparency(Number)
+	StarLight_ESPLibrary.TextTransparency = Number
+	for i, Label in pairs(Labels) do
+		Label.TextTransparency = Number
+	end
 end
 
-function PlayerESP.RemoveESP(Player)
-    local ESPData = Library.Drawings.ESP[Player]
-    if ESPData then
-        for _, Line in pairs(ESPData.Box) do
-            pcall(function() Line:Remove() end)
-        end
-        pcall(function() ESPData.Tracer:Remove() end)
-        pcall(function() ESPData.Dot:Remove() end)
-        for _, Object in pairs(ESPData.HealthBar) do
-            pcall(function() Object:Remove() end)
-        end
-        for _, Object in pairs(ESPData.Info) do
-            pcall(function() Object:Remove() end)
-        end
-        for _, Object in pairs(ESPData.Fills) do
-            pcall(function() Object:Remove() end)
-        end
-        Library.Drawings.ESP[Player] = nil
-    end
-    
-    local SkeletonData = Library.Drawings.Skeleton[Player]
-    if SkeletonData then
-        for _, Bone in pairs(SkeletonData) do
-            pcall(function() Bone:Remove() end)
-        end
-        Library.Drawings.Skeleton[Player] = nil
-    end
-    
-    local Arrow = Library.Arrows[Player]
-    if Arrow then
-        pcall(function() Arrow:Destroy() end)
-        Library.Arrows[Player] = nil
-    end
-    
-    local Chams = Library.ChamsObjects[Player]
-    if Chams then
-        pcall(function() Chams:Destroy() end)
-        Library.ChamsObjects[Player] = nil
-    end
+function StarLight_ESPLibrary:SetFillTransparency(Number)
+	StarLight_ESPLibrary.FillTransparency = Number
+	for i, Highlight in pairs(Highlights) do
+		if Highlight:IsA("Highlight") then
+			Highlight.FillTransparency = Number
+		end
+	end
 end
 
-function PlayerESP.UpdateChams(Player, Character, IsVisible)
-    if not Library.Settings.Chams.Enabled then
-        local Existing = Library.ChamsObjects[Player]
-        if Existing then
-            Existing:Destroy()
-            Library.ChamsObjects[Player] = nil
-        end
-        return
-    end
-    
-    if not Character then return end
-    local Model = Character
-    local Chams = Library.ChamsObjects[Player]
-    local ChamType = Library.Settings.Chams.Type
-    local Color = GetColor(Library.Settings.Chams.FillColor)
-    
-    if not Chams or Chams.ClassName:lower() ~= ChamType:lower() then
-        if Chams then
-            pcall(function() Chams:Destroy() end)
-        end
-        
-        if ChamType == "Highlight" then
-            Chams = Instance.new("Highlight")
-            Chams.FillColor = Library.Settings.Chams.FillColor
-            Chams.OutlineColor = Library.Settings.Chams.OutlineColor
-            Chams.FillTransparency = Library.Settings.Chams.FillTransparency
-            Chams.OutlineTransparency = Library.Settings.Chams.OutlineTransparency
-            Chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        elseif ChamType == "SelectionBox" then
-            Chams = Instance.new("SelectionBox")
-            Chams.Color3 = Library.Settings.Chams.FillColor
-            Chams.SurfaceColor3 = Library.Settings.Chams.FillColor
-            Chams.LineThickness = 0.01
-        elseif ChamType == "BoxAdornment" then
-            Chams = Instance.new("BoxHandleAdornment")
-            Chams.Color3 = Library.Settings.Chams.FillColor
-            Chams.Transparency = Library.Settings.Chams.FillTransparency
-            Chams.AlwaysOnTop = true
-            Chams.ZIndex = 10
-            local Size = Vector3.new(5, 6, 2)
-            if Model:IsA("Model") and Model.PrimaryPart then
-                Size = Model.PrimaryPart.Size
-            elseif Model:FindFirstChild("HumanoidRootPart") then
-                Size = Model.HumanoidRootPart.Size
-            end
-            Chams.Size = Size
-        elseif ChamType == "SphereAdornment" then
-            Chams = Instance.new("SphereHandleAdornment")
-            Chams.Color3 = Library.Settings.Chams.FillColor
-            Chams.Transparency = Library.Settings.Chams.FillTransparency
-            Chams.AlwaysOnTop = true
-            Chams.ZIndex = 10
-            Chams.Radius = 3
-        else
-            Chams = Instance.new("BoxHandleAdornment")
-            Chams.Color3 = Library.Settings.Chams.FillColor
-            Chams.Transparency = Library.Settings.Chams.FillTransparency
-            Chams.AlwaysOnTop = true
-            Chams.ZIndex = 10
-            Chams.Size = Vector3.new(4, 6, 2)
-        end
-        
-        Chams.Name = RandomString()
-        Chams.Adornee = Model
-        Chams.Parent = ScreenGui
-        Library.ChamsObjects[Player] = Chams
-    end
-    
-    if Chams then
-        Chams.Adornee = Model
-        if ChamType == "Highlight" then
-            Chams.FillColor = GetColor(Library.Settings.Chams.FillColor)
-            Chams.OutlineColor = GetColor(Library.Settings.Chams.OutlineColor)
-            Chams.Enabled = IsVisible
-        elseif ChamType == "SelectionBox" then
-            Chams.Color3 = GetColor(Library.Settings.Chams.FillColor)
-            Chams.SurfaceColor3 = GetColor(Library.Settings.Chams.FillColor)
-        else
-            Chams.Color3 = GetColor(Library.Settings.Chams.FillColor)
-            Chams.Visible = IsVisible
-        end
-    end
+function StarLight_ESPLibrary:SetOutlineTransparency(Number)
+	StarLight_ESPLibrary.OutlineTransparency = Number
+	for i, Highlight in pairs(Highlights) do
+		if Highlight:IsA("Highlight") then
+			Highlight.OutlineTransparency = Number
+		end
+	end
 end
 
-function PlayerESP.UpdateESP(Player)
-    if not Library.Settings.Enabled then 
-        PlayerESP.RemoveESP(Player)
-        return 
-    end
-    
-    local ESPData = Library.Drawings.ESP[Player]
-    if not ESPData then 
-        PlayerESP.CreateESP(Player)
-        ESPData = Library.Drawings.ESP[Player]
-    end
-    
-    local Arrow = Library.Arrows[Player]
-    local SkeletonData = Library.Drawings.Skeleton[Player]
-    local Character = Player.Character
-    
-    if not Character then
-        for _, Line in pairs(ESPData.Box) do Line.Visible = false end
-        ESPData.Tracer.Visible = false
-        ESPData.Dot.Visible = false
-        for _, Object in pairs(ESPData.HealthBar) do Object.Visible = false end
-        for _, Object in pairs(ESPData.Info) do Object.Visible = false end
-        if Arrow then Arrow.Visible = false end
-        if SkeletonData then
-            for _, Bone in pairs(SkeletonData) do Bone.Visible = false end
-        end
-        PlayerESP.UpdateChams(Player, nil, false)
-        return
-    end
-    
-    local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
-    local Humanoid = Character:FindFirstChild("Humanoid")
-    
-    if not HumanoidRootPart or not Humanoid or Humanoid.Health <= 0 then
-        for _, Line in pairs(ESPData.Box) do Line.Visible = false end
-        ESPData.Tracer.Visible = false
-        ESPData.Dot.Visible = false
-        for _, Object in pairs(ESPData.HealthBar) do Object.Visible = false end
-        for _, Object in pairs(ESPData.Info) do Object.Visible = false end
-        if Arrow then Arrow.Visible = false end
-        if SkeletonData then
-            for _, Bone in pairs(SkeletonData) do Bone.Visible = false end
-        end
-        PlayerESP.UpdateChams(Player, nil, false)
-        return
-    end
-    
-    local Position, OnScreen = Camera:WorldToViewportPoint(HumanoidRootPart.Position)
-    local Distance = (HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude
-    
-    if not OnScreen or Distance > Library.Settings.MaxDistance then
-        for _, Line in pairs(ESPData.Box) do Line.Visible = false end
-        ESPData.Tracer.Visible = false
-        ESPData.Dot.Visible = false
-        for _, Object in pairs(ESPData.HealthBar) do Object.Visible = false end
-        for _, Object in pairs(ESPData.Info) do Object.Visible = false end
-        if SkeletonData then
-            for _, Bone in pairs(SkeletonData) do Bone.Visible = false end
-        end
-        PlayerESP.UpdateChams(Player, nil, false)
-    end
-    
-    if not OnScreen then
-        if Library.Settings.Arrow.Enabled and Arrow then
-            local screenSize = Camera.ViewportSize
-            local centerPos = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
-            local partPos = Vector2.new(Position.X, Position.Y)
-            local IsInverted = Position.Z <= 0
-            local invert = IsInverted and -1 or 1
-            local direction = (partPos - centerPos)
-            local arctan = math.atan2(direction.Y, direction.X)
-            local angle = math.deg(arctan) + 90
-            local offset = (Library.Settings.Arrow.CenterOffset * 0.001) * screenSize.Y
-            
-            Arrow.Rotation = angle + 180 * (IsInverted and 0 or 1)
-            Arrow.Position = UDim2.new(0, centerPos.X + (offset * math.cos(arctan) * invert), 0, centerPos.Y + (offset * math.sin(arctan) * invert))
-            Arrow.ImageColor3 = GetColor(Library.Settings.Arrow.Color)
-            Arrow.Visible = true
-        end
-        PlayerESP.UpdateChams(Player, Character, false)
-        return
-    else
-        if Arrow then Arrow.Visible = false end
-    end
-    
-    PlayerESP.UpdateChams(Player, Character, true)
-    
-    local Scale = 1 / (Position.Z * math.tan(math.rad(Camera.FieldOfView / 2)) * 2) * 1000
-    local Width = math.floor(4.5 * Scale)
-    local Height = math.floor(6 * Scale)
-    local X = math.floor(Position.X)
-    local Y = math.floor(Position.Y)
-    local TopLeft = Vector2.new(math.floor(X - Width / 2), math.floor((Y - Height / 2) + (Scale / 2)))
-    local BoxSize = Vector2.new(Width, Height)
-    
-    local BoxColor = GetColor(Library.Settings.Box.Color)
-    
-    if Library.Settings.Box.Enabled then
-        if Library.Settings.Box.Style == 1 then
-            local CornerSize = math.min(Width, Height) * 0.2
-            
-            ESPData.Box.TopLeft.From = TopLeft
-            ESPData.Box.TopLeft.To = TopLeft + Vector2.new(CornerSize, 0)
-            ESPData.Box.TopLeft.Color = BoxColor
-            ESPData.Box.TopLeft.Visible = true
-            
-            ESPData.Box.TopRight.From = TopLeft + Vector2.new(BoxSize.X, 0)
-            ESPData.Box.TopRight.To = TopLeft + Vector2.new(BoxSize.X - CornerSize, 0)
-            ESPData.Box.TopRight.Color = BoxColor
-            ESPData.Box.TopRight.Visible = true
-            
-            ESPData.Box.BottomLeft.From = TopLeft + Vector2.new(0, BoxSize.Y)
-            ESPData.Box.BottomLeft.To = TopLeft + Vector2.new(CornerSize, BoxSize.Y)
-            ESPData.Box.BottomLeft.Color = BoxColor
-            ESPData.Box.BottomLeft.Visible = true
-            
-            ESPData.Box.BottomRight.From = TopLeft + Vector2.new(BoxSize.X, BoxSize.Y)
-            ESPData.Box.BottomRight.To = TopLeft + Vector2.new(BoxSize.X - CornerSize, BoxSize.Y)
-            ESPData.Box.BottomRight.Color = BoxColor
-            ESPData.Box.BottomRight.Visible = true
-            
-            ESPData.Box.Left.From = TopLeft
-            ESPData.Box.Left.To = TopLeft + Vector2.new(0, CornerSize)
-            ESPData.Box.Left.Color = BoxColor
-            ESPData.Box.Left.Visible = true
-            
-            ESPData.Box.Right.From = TopLeft + Vector2.new(BoxSize.X, 0)
-            ESPData.Box.Right.To = TopLeft + Vector2.new(BoxSize.X, CornerSize)
-            ESPData.Box.Right.Color = BoxColor
-            ESPData.Box.Right.Visible = true
-            
-            ESPData.Box.Top.From = TopLeft + Vector2.new(0, BoxSize.Y)
-            ESPData.Box.Top.To = TopLeft + Vector2.new(0, BoxSize.Y - CornerSize)
-            ESPData.Box.Top.Color = BoxColor
-            ESPData.Box.Top.Visible = true
-            
-            ESPData.Box.Bottom.From = TopLeft + Vector2.new(BoxSize.X, BoxSize.Y)
-            ESPData.Box.Bottom.To = TopLeft + Vector2.new(BoxSize.X, BoxSize.Y - CornerSize)
-            ESPData.Box.Bottom.Color = BoxColor
-            ESPData.Box.Bottom.Visible = true
-        else
-            ESPData.Box.Left.From = TopLeft
-            ESPData.Box.Left.To = TopLeft + Vector2.new(0, BoxSize.Y)
-            ESPData.Box.Left.Color = BoxColor
-            ESPData.Box.Left.Visible = true
-            
-            ESPData.Box.Right.From = TopLeft + Vector2.new(BoxSize.X, 0)
-            ESPData.Box.Right.To = TopLeft + Vector2.new(BoxSize.X, BoxSize.Y)
-            ESPData.Box.Right.Color = BoxColor
-            ESPData.Box.Right.Visible = true
-            
-            ESPData.Box.Top.From = TopLeft
-            ESPData.Box.Top.To = TopLeft + Vector2.new(BoxSize.X, 0)
-            ESPData.Box.Top.Color = BoxColor
-            ESPData.Box.Top.Visible = true
-            
-            ESPData.Box.Bottom.From = TopLeft + Vector2.new(0, BoxSize.Y)
-            ESPData.Box.Bottom.To = TopLeft + Vector2.new(BoxSize.X, BoxSize.Y)
-            ESPData.Box.Bottom.Color = BoxColor
-            ESPData.Box.Bottom.Visible = true
-            
-            ESPData.Box.TopLeft.Visible = false
-            ESPData.Box.TopRight.Visible = false
-            ESPData.Box.BottomLeft.Visible = false
-            ESPData.Box.BottomRight.Visible = false
-        end
-        
-        if Library.Settings.Box.Filled.Enabled then
-            local Fill = ESPData.Fills[1]
-            if not Fill then
-                Fill = Drawing.new("Square")
-                ESPData.Fills[1] = Fill
-            end
-            Fill.Visible = true
-            Fill.Color = BoxColor
-            Fill.Transparency = Library.Settings.Box.Filled.Transparency
-            Fill.Filled = true
-            Fill.Position = TopLeft
-            Fill.Size = BoxSize
-        else
-            for _, Fill in pairs(ESPData.Fills) do
-                Fill.Visible = false
-            end
-        end
-    else
-        for _, Line in pairs(ESPData.Box) do
-            Line.Visible = false
-        end
-        for _, Fill in pairs(ESPData.Fills) do
-            Fill.Visible = false
-        end
-    end
-    
-    if Library.Settings.Tracer.Enabled then
-        ESPData.Tracer.From = GetTracerOrigin(Library.Settings.Tracer.Origin)
-        ESPData.Tracer.To = Vector2.new(Position.X, Position.Y)
-        ESPData.Tracer.Color = GetColor(Library.Settings.Tracer.Color)
-        ESPData.Tracer.Visible = true
-    else
-        ESPData.Tracer.Visible = false
-    end
-    
-    if Library.Settings.Dot.Enabled then
-        ESPData.Dot.Position = Vector2.new(Position.X, Position.Y)
-        ESPData.Dot.Color = GetColor(Library.Settings.Dot.Color)
-        ESPData.Dot.Visible = true
-    else
-        ESPData.Dot.Visible = false
-    end
-    
-    if Library.Settings.HealthBar.Enabled then
-        local Health = Humanoid.Health
-        local MaxHealth = Humanoid.MaxHealth
-        local HealthPercent = Health / MaxHealth
-        local BarHeight = Height
-        local BarWidth = 4
-        local BarX = Library.Settings.HealthBar.Position == 1 and (TopLeft.X - BarWidth - 4) or (TopLeft.X + BoxSize.X + 4)
-        local BarPosition = Vector2.new(BarX, TopLeft.Y)
-        
-        ESPData.HealthBar.Outline.Size = Vector2.new(BarWidth, BarHeight)
-        ESPData.HealthBar.Outline.Position = BarPosition
-        ESPData.HealthBar.Outline.Visible = true
-        
-        ESPData.HealthBar.Fill.Size = Vector2.new(BarWidth - 2, (BarHeight - 2) * HealthPercent)
-        ESPData.HealthBar.Fill.Position = Vector2.new(BarPosition.X + 1, BarPosition.Y + 1 + ((BarHeight - 2) * (1 - HealthPercent)))
-        local HealthColor = Color3.new(1 - HealthPercent, HealthPercent, 0)
-        ESPData.HealthBar.Fill.Color = HealthColor
-        ESPData.HealthBar.Fill.Visible = true
-    else
-        ESPData.HealthBar.Outline.Visible = false
-        ESPData.HealthBar.Fill.Visible = false
-    end
-    
-    if Library.Settings.Name.Enabled then
-        ESPData.Info.Name.Text = Player.Name
-        ESPData.Info.Name.Position = Vector2.new(TopLeft.X + Width / 2, TopLeft.Y - 20)
-        ESPData.Info.Name.Color = GetColor(Library.Settings.Name.Color)
-        ESPData.Info.Name.Visible = true
-    else
-        ESPData.Info.Name.Visible = false
-    end
-    
-    if Library.Settings.Distance.Enabled then
-        ESPData.Info.Distance.Text = math.floor(Distance) .. " studs"
-        ESPData.Info.Distance.Position = Vector2.new(TopLeft.X + Width / 2, TopLeft.Y + BoxSize.Y + 5)
-        ESPData.Info.Distance.Color = GetColor(Library.Settings.Distance.Color)
-        ESPData.Info.Distance.Visible = true
-    else
-        ESPData.Info.Distance.Visible = false
-    end
-    
-    if Library.Settings.Skeleton.Enabled and SkeletonData then
-        local function GetPart(name)
-            return Character:FindFirstChild(name) or Character:FindFirstChild(name:gsub("Upper", ""):gsub("Lower", ""))
-        end
-        
-        local function DrawBone(Part1, Part2, Line)
-            if not Part1 or not Part2 then
-                Line.Visible = false
-                return
-            end
-            local Pos1 = Part1.Position
-            local Pos2 = Part2.Position
-            local Screen1, Vis1 = Camera:WorldToViewportPoint(Pos1)
-            local Screen2, Vis2 = Camera:WorldToViewportPoint(Pos2)
-            if Vis1 and Vis2 and Screen1.Z > 0 and Screen2.Z > 0 then
-                Line.From = Vector2.new(Screen1.X, Screen1.Y)
-                Line.To = Vector2.new(Screen2.X, Screen2.Y)
-                Line.Color = GetColor(Library.Settings.Skeleton.Color)
-                Line.Visible = true
-            else
-                Line.Visible = false
-            end
-        end
-        
-        local Head = GetPart("Head")
-        local UpperTorso = GetPart("UpperTorso") or GetPart("Torso")
-        local LowerTorso = GetPart("LowerTorso") or GetPart("Torso")
-        local LeftUpperArm = GetPart("LeftUpperArm") or GetPart("Left Arm")
-        local LeftLowerArm = GetPart("LeftLowerArm") or GetPart("Left Arm")
-        local LeftHand = GetPart("LeftHand") or GetPart("Left Arm")
-        local RightUpperArm = GetPart("RightUpperArm") or GetPart("Right Arm")
-        local RightLowerArm = GetPart("RightLowerArm") or GetPart("Right Arm")
-        local RightHand = GetPart("RightHand") or GetPart("Right Arm")
-        local LeftUpperLeg = GetPart("LeftUpperLeg") or GetPart("Left Leg")
-        local LeftLowerLeg = GetPart("LeftLowerLeg") or GetPart("Left Leg")
-        local LeftFoot = GetPart("LeftFoot") or GetPart("Left Leg")
-        local RightUpperLeg = GetPart("RightUpperLeg") or GetPart("Right Leg")
-        local RightLowerLeg = GetPart("RightLowerLeg") or GetPart("Right Leg")
-        local RightFoot = GetPart("RightFoot") or GetPart("Right Leg")
-        
-        DrawBone(Head, UpperTorso, SkeletonData.Head)
-        DrawBone(UpperTorso, LowerTorso, SkeletonData.UpperSpine)
-        DrawBone(UpperTorso, LeftUpperArm, SkeletonData.LeftShoulder)
-        DrawBone(LeftUpperArm, LeftLowerArm, SkeletonData.LeftUpperArm)
-        DrawBone(LeftLowerArm, LeftHand, SkeletonData.LeftLowerArm)
-        DrawBone(UpperTorso, RightUpperArm, SkeletonData.RightShoulder)
-        DrawBone(RightUpperArm, RightLowerArm, SkeletonData.RightUpperArm)
-        DrawBone(RightLowerArm, RightHand, SkeletonData.RightLowerArm)
-        DrawBone(LowerTorso, LeftUpperLeg, SkeletonData.LeftHip)
-        DrawBone(LeftUpperLeg, LeftLowerLeg, SkeletonData.LeftUpperLeg)
-        DrawBone(LeftLowerLeg, LeftFoot, SkeletonData.LeftLowerLeg)
-        DrawBone(LowerTorso, RightUpperLeg, SkeletonData.RightHip)
-        DrawBone(RightUpperLeg, RightLowerLeg, SkeletonData.RightUpperLeg)
-        DrawBone(RightLowerLeg, RightFoot, SkeletonData.RightLowerLeg)
-    elseif SkeletonData then
-        for _, Bone in pairs(SkeletonData) do
-            Bone.Visible = false
-        end
-    end
+function StarLight_ESPLibrary:SetTextSize(Number)
+	StarLight_ESPLibrary.TextSize = Number
+	for i, Label in pairs(Labels) do
+		Label.TextSize = Number
+	end
 end
 
-local RadarSystem = {}
-RadarSystem.__index = RadarSystem
-
-function RadarSystem.new()
-    local self = setmetatable({}, RadarSystem)
-    self.Frame = Instance.new("Frame")
-    self.Frame.Name = RandomString()
-    self.Frame.Parent = ScreenGui
-    self.Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    self.Frame.BorderColor3 = Color3.fromRGB(60, 60, 60)
-    self.Frame.BorderSizePixel = 2
-    self.Frame.BackgroundTransparency = 0.5
-    self.Frame.Size = UDim2.new(0, 200, 0, 200)
-    self.Frame.Position = UDim2.new(0, 150, 0, 150)
-    
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(1, 0)
-    Corner.Parent = self.Frame
-    
-    local CenterDot = Drawing.new("Circle")
-    CenterDot.Radius = 3
-    CenterDot.Filled = true
-    CenterDot.Color = Color3.new(1, 1, 1)
-    CenterDot.Position = Vector2.new(0, 0)
-    CenterDot.Visible = false
-    self.CenterDot = CenterDot
-    
-    self.PlayerDots = {}
-    return self
+function StarLight_ESPLibrary:SetTextOutlineTransparency(Number)
+	StarLight_ESPLibrary.TextOutlineTransparency = Number
+	for i, Label in pairs(Labels) do
+		Label.TextStrokeTransparency = Number
+	end
 end
 
-function RadarSystem:Update()
-    if not Library.Settings.Radar.Enabled then
-        self.Frame.Visible = false
-        self.CenterDot.Visible = false
-        for _, Dot in pairs(self.PlayerDots) do
-            Dot.Visible = false
-        end
-        return
-    end
-    
-    self.Frame.Visible = true
-    local RadarPos = Library.Settings.Radar.Position
-    local RadarRadius = Library.Settings.Radar.Radius
-    self.Frame.Position = UDim2.new(0, RadarPos.X - RadarRadius, 0, RadarPos.Y - RadarRadius)
-    self.Frame.Size = UDim2.new(0, RadarRadius * 2, 0, RadarRadius * 2)
-    
-    local CenterPos = Vector2.new(RadarPos.X, RadarPos.Y)
-    self.CenterDot.Position = CenterPos
-    self.CenterDot.Visible = true
-    
-    local LocalChar = LocalPlayer.Character
-    if not LocalChar or not LocalChar:FindFirstChild("HumanoidRootPart") then return end
-    local LocalRoot = LocalChar.HumanoidRootPart
-    local LocalPos = LocalRoot.Position
-    local LocalCF = LocalRoot.CFrame
-    
-    for _, Player in pairs(Players:GetPlayers()) do
-        if Player == LocalPlayer then continue end
-        
-        local Dot = self.PlayerDots[Player]
-        if not Dot then
-            Dot = Drawing.new("Circle")
-            Dot.Radius = 4
-            Dot.Filled = true
-            Dot.Color = Library.Settings.Radar.Color
-            self.PlayerDots[Player] = Dot
-        end
-        
-        local Char = Player.Character
-        if Char and Char:FindFirstChild("HumanoidRootPart") then
-            local Pos = Char.HumanoidRootPart.Position
-            local RelativePos = Pos - LocalPos
-            local ObjectSpace = LocalCF:PointToObjectSpace(Pos)
-            local Scale = Library.Settings.Radar.Scale
-            local X = -ObjectSpace.X * Scale
-            local Y = -ObjectSpace.Z * Scale
-            local DotPos = CenterPos + Vector2.new(X, Y)
-            
-            if (DotPos - CenterPos).Magnitude <= RadarRadius - 4 then
-                Dot.Position = DotPos
-                Dot.Visible = true
-            else
-                local Direction = (DotPos - CenterPos).Unit
-                local EdgePos = CenterPos + Direction * (RadarRadius - 6)
-                Dot.Position = EdgePos
-                Dot.Visible = true
-            end
-        else
-            Dot.Visible = false
-        end
-    end
+function StarLight_ESPLibrary:SetFont(Font)
+	StarLight_ESPLibrary.Font = Font
+	for i, Label in pairs(Labels) do
+		Label.Font = Font
+	end
 end
 
-local Radar = RadarSystem.new()
-
-local function UpdateRainbow()
-    if Library.Settings.Rainbow then
-        RainbowHue = RainbowHue + 0.002
-        if RainbowHue > 1 then RainbowHue = 0 end
-        RainbowColor = Color3.fromHSV(RainbowHue, 0.8, 1)
-    end
+function StarLight_ESPLibrary:UpdateObjectText(Object, Text)
+	if Labels[Object] then
+		TextTable[Object] = Text
+	end
 end
 
-local function UpdateAll()
-    UpdateRainbow()
-    Radar:Update()
-    
-    for _, Player in pairs(Players:GetPlayers()) do
-        if Player ~= LocalPlayer then
-            PlayerESP.UpdateESP(Player)
-        end
-    end
+function StarLight_ESPLibrary:UpdateObjectColor(Object, Color)
+	ColorTable[Object] = Color
+	if Labels[Object] then
+		Labels[Object].TextColor3 = Color
+	end
+	if StarLight_ESPLibrary.Adornments[Object] then
+		StarLight_ESPLibrary.Adornments[Object].Color3 = Color
+	end
 end
 
-function Library:Toggle(state)
-    Library.Settings.Enabled = state
-    if not state then
-        for Player, _ in pairs(Library.Drawings.ESP) do
-            PlayerESP.RemoveESP(Player)
-        end
-    end
+function StarLight_ESPLibrary:SetOutlineColor(Color)
+	StarLight_ESPLibrary.OutlineColor = Color
 end
 
-function Library:SetBox(state)
-    Library.Settings.Box.Enabled = state
+function StarLight_ESPLibrary:SetRainbow(Value)
+	StarLight_ESPLibrary.Rainbow = Value
 end
 
-function Library:SetTracer(state)
-    Library.Settings.Tracer.Enabled = state
+function StarLight_ESPLibrary:SetShowDistance(Value)
+	StarLight_ESPLibrary.ShowDistance = Value
 end
 
-function Library:SetArrow(state)
-    Library.Settings.Arrow.Enabled = state
+function StarLight_ESPLibrary:SetMatchColors(Value)
+	StarLight_ESPLibrary.MatchColors = Value
 end
 
-function Library:SetChams(state)
-    Library.Settings.Chams.Enabled = state
+function StarLight_ESPLibrary:SetTracers(Value)
+	StarLight_ESPLibrary.Tracers = Value
+	TracersFrame.Visible = Value
 end
 
-function Library:SetSkeleton(state)
-    Library.Settings.Skeleton.Enabled = state
+function StarLight_ESPLibrary:SetArrows(Value)
+	StarLight_ESPLibrary.Arrows = Value
+	ArrowsFrame.Visible = Value
 end
 
-function Library:SetDot(state)
-    Library.Settings.Dot.Enabled = state
+function StarLight_ESPLibrary:SetArrowRadius(Value)
+	StarLight_ESPLibrary.ArrowRadius = Value
 end
 
-function Library:SetRadar(state)
-    Library.Settings.Radar.Enabled = state
+function StarLight_ESPLibrary:SetTracerOrigin(Value)
+	StarLight_ESPLibrary.TracerOrigin = Value
 end
 
-function Library:SetRainbow(state)
-    Library.Settings.Rainbow = state
+function StarLight_ESPLibrary:SetDistanceSizeRatio(Value)
+	StarLight_ESPLibrary.DistanceSizeRatio = Value
 end
 
-function Library:Unload()
-    for _, Connection in pairs(Library._connections) do
-        if Connection then Connection:Disconnect() end
-    end
-    for Player, _ in pairs(Library.Drawings.ESP) do
-        PlayerESP.RemoveESP(Player)
-    end
-    for _, Dot in pairs(Radar.PlayerDots) do
-        pcall(function() Dot:Remove() end)
-    end
-    pcall(function() Radar.CenterDot:Remove() end)
-    pcall(function() ScreenGui:Destroy() end)
-    Library.Drawings = {ESP = {}, Skeleton = {}, RadarObjects = {}}
-    Library.Highlights = {}
-    Library.Arrows = {}
-    Library.ChamsObjects = {}
+function StarLight_ESPLibrary:SetTracerSize(Value)
+	StarLight_ESPLibrary.TracerSize = 0.5 * Value
 end
 
-table.insert(Library._connections, RunService.RenderStepped:Connect(UpdateAll))
-
-table.insert(Library._connections, Players.PlayerAdded:Connect(function(Player)
-    PlayerESP.CreateESP(Player)
-end))
-
-table.insert(Library._connections, Players.PlayerRemoving:Connect(function(Player)
-    PlayerESP.RemoveESP(Player)
-    if Radar.PlayerDots[Player] then
-        Radar.PlayerDots[Player]:Remove()
-        Radar.PlayerDots[Player] = nil
-    end
-end))
-
-table.insert(Library._connections, workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-    Camera = workspace.CurrentCamera
-end))
-
-for _, Player in pairs(Players:GetPlayers()) do
-    if Player ~= LocalPlayer then
-        PlayerESP.CreateESP(Player)
-    end
+function StarLight_ESPLibrary:SetTransparency(Number)
+	StarLight_ESPLibrary.Transparency = Number
+	for i, Adornment in pairs(StarLight_ESPLibrary.Adornments) do
+		if Adornment then
+			Adornment.Transparency = Number
+		end
+	end
 end
 
-getgenv().StarLightESP = Library
-return Library
+function StarLight_ESPLibrary:SetThickness(Number)
+	StarLight_ESPLibrary.Thickness = Number
+end
+
+function RemoveObjectFromTables(Object)
+	for index, obj in pairs(TotalObjects) do
+		if obj == Object then
+			table.remove(TotalObjects, index)
+			break
+		end
+	end
+end
+
+function StarLight_ESPLibrary:RemoveESP(Object)
+	if StarLight_ESPLibrary.Unloaded == true or StarLight_ESPLibrary.ElementsEnabled[Object] ~= true then return end
+	StarLight_ESPLibrary.ElementsEnabled[Object] = false
+	StarLight_ESPLibrary.TransparencyEnabled[Object] = false
+
+	local Value = Instance.new("Frame", game.ReplicatedStorage)
+	Value.BackgroundTransparency = 0
+	Value.Name = StarLight_ESPLibrary:GenerateRandomString()
+	Debris:AddItem(Value, StarLight_ESPLibrary.FadeTime + 0.5)
+
+	local TextFrame = Frames[Object]
+	local TextLabel = Labels[Object]
+
+	if TextLabel then
+		TweenService:Create(TextLabel, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {TextTransparency = 1}):Play()
+	end
+
+	if StarLight_ESPLibrary.Lines[Object] ~= nil then
+		if StarLight_ESPLibrary.Lines[Object][1] ~= nil then
+			TweenService:Create(StarLight_ESPLibrary.Lines[Object][1], TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+		end
+		if StarLight_ESPLibrary.Lines[Object][2] ~= nil then
+			TweenService:Create(StarLight_ESPLibrary.Lines[Object][2], TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {Transparency = 1}):Play()
+		end
+	end
+
+	local Highlight
+	if Highlights[Object] then
+		TweenService:Create(Highlights[Object], TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {FillTransparency = 1}):Play()
+		TweenService:Create(Highlights[Object], TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {OutlineTransparency = 1}):Play()
+		Highlight = Highlights[Object]
+	end
+
+	local Adornment
+	if StarLight_ESPLibrary.Adornments[Object] then
+		TweenService:Create(StarLight_ESPLibrary.Adornments[Object], TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {Transparency = 1}):Play()
+		Adornment = StarLight_ESPLibrary.Adornments[Object]
+	end
+
+	if StarLight_ESPLibrary.Lines[Object][2] ~= nil then
+		TweenService:Create(StarLight_ESPLibrary.Lines[Object][2], TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {Transparency = 1}):Play()
+	end
+
+	if ArrowsTable[Object] ~= nil then
+		TweenService:Create(ArrowsTable[Object], TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {ImageTransparency = 1}):Play()
+	end
+
+	if Object.Parent == nil then
+		if StarLight_ESPLibrary.ElementsEnabled[Object] == false then
+			if Frames[Object] then
+				Frames[Object]:Destroy()
+				Frames[Object] = nil
+			end
+			Objects[Object] = nil
+			if Highlight then
+				Highlight:Destroy()
+				Highlights[Object] = nil
+			end
+			if Adornment then
+				Adornment:Destroy()
+				StarLight_ESPLibrary.Adornments[Object] = nil
+			end
+			RemoveObjectFromTables(Object)
+			if ArrowsTable[Object] then
+				ArrowsTable[Object]:Destroy()
+				ArrowsTable[Object] = nil
+			end
+			if Connections[Object] then
+				Connections[Object]:Disconnect()
+			end
+			if StarLight_ESPLibrary.Lines[Object] ~= nil then
+				if StarLight_ESPLibrary.Lines[Object][1] ~= nil then
+					StarLight_ESPLibrary.Lines[Object][1]:Destroy()
+				end
+				if StarLight_ESPLibrary.Lines[Object][2] ~= nil then
+					StarLight_ESPLibrary.Lines[Object][2]:Destroy()
+				end
+				StarLight_ESPLibrary.Lines[Object] = {}
+			end
+			if StarLight_ESPLibrary.TracerTable[Object] ~= nil then
+				StarLight_ESPLibrary.TracerTable[Object]:Destroy()
+			end
+			Value:Destroy()
+		else
+			if Highlight then
+				TweenService:Create(Highlight, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {FillTransparency = StarLight_ESPLibrary.FillTransparency}):Play()
+				TweenService:Create(Highlight, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {OutlineTransparency = StarLight_ESPLibrary.OutlineTransparency}):Play()
+			end
+			if Adornment then
+				TweenService:Create(Adornment, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {Transparency = StarLight_ESPLibrary.Transparency}):Play()
+			end
+		end
+	else
+		local DestroyTween = TweenService:Create(Value, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {BackgroundTransparency = 1})
+		DestroyTween:Play()
+		local DestroyTween1 = DestroyTween.Completed:Once(function()
+			if StarLight_ESPLibrary.ElementsEnabled[Object] == false then
+				if Frames[Object] then
+					Frames[Object]:Destroy()
+					Frames[Object] = nil
+				end
+				RemoveObjectFromTables(Object)
+				if Connections[Object] then
+					Connections[Object]:Disconnect()
+				end
+				if ArrowsTable[Object] then
+					ArrowsTable[Object]:Destroy()
+					ArrowsTable[Object] = nil
+				end
+				if Highlight then
+					Highlight:Destroy()
+					Highlights[Object] = nil
+				end
+				if Adornment then
+					Adornment:Destroy()
+					StarLight_ESPLibrary.Adornments[Object] = nil
+				end
+				if StarLight_ESPLibrary.Lines[Object] ~= nil then
+					if StarLight_ESPLibrary.Lines[Object][1] ~= nil then
+						StarLight_ESPLibrary.Lines[Object][1]:Destroy()
+					end
+					if StarLight_ESPLibrary.Lines[Object][2] ~= nil then
+						StarLight_ESPLibrary.Lines[Object][2]:Destroy()
+					end
+					StarLight_ESPLibrary.Lines[Object] = {}
+				end
+				if StarLight_ESPLibrary.TracerTable[Object] ~= nil then
+					StarLight_ESPLibrary.TracerTable[Object]:Destroy()
+				end
+				Value:Destroy()
+			else
+				if Highlight then
+					TweenService:Create(Highlight, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {FillTransparency = StarLight_ESPLibrary.FillTransparency}):Play()
+					TweenService:Create(Highlight, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {OutlineTransparency = StarLight_ESPLibrary.OutlineTransparency}):Play()
+				end
+				if Adornment then
+					TweenService:Create(Adornment, TweenInfo.new(StarLight_ESPLibrary.FadeTime, Enum.EasingStyle.Quad), {Transparency = StarLight_ESPLibrary.Transparency}):Play()
+				end
+			end
+		end)
+	end
+end
+
+local RainbowConnection = RunService.RenderStepped:Connect(function(Delta)
+	RainbowTable.Step = RainbowTable.Step + Delta
+	if RainbowTable.Step >= (1 / 60) then
+		RainbowTable.Step = 0
+		RainbowTable.HueSetup = RainbowTable.HueSetup + (1 / 400)
+		if RainbowTable.HueSetup > 1 then RainbowTable.HueSetup = 0 end
+		RainbowTable.Hue = RainbowTable.HueSetup
+		RainbowTable.Color = Color3.fromHSV(RainbowTable.Hue, 0.8, 1)
+		StarLight_ESPLibrary.RainbowColor = Color3.fromHSV(RainbowTable.Hue, 0.8, 1)
+	end
+end)
+
+CameraConnection = Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	Camera = Workspace.CurrentCamera
+end)
+
+function StarLight_ESPLibrary:Unload()
+	for i, Object in pairs(StarLight_ESPLibrary.Objects) do
+		StarLight_ESPLibrary:RemoveESP(Object)
+	end
+	for i, Connection in pairs(ConnectionsTable) do
+		Connection:Disconnect()
+	end
+	RainbowConnection:Disconnect()
+	CameraConnection:Disconnect()
+	ScreenGui.Enabled = false
+	StarLight_ESPLibrary.Unloaded = true
+end
+
+ObjectsFolder.Name = StarLight_ESPLibrary:GenerateRandomString()
+ScreenGui.Name = StarLight_ESPLibrary:GenerateRandomString()
+HighlightsFolder.Name = StarLight_ESPLibrary:GenerateRandomString()
+TracersFrame.Name = StarLight_ESPLibrary:GenerateRandomString()
+ArrowsFrame.Name = StarLight_ESPLibrary:GenerateRandomString()
+BillboardsFolder.Name = StarLight_ESPLibrary:GenerateRandomString()
+AdornmentsFolder.Name = StarLight_ESPLibrary:GenerateRandomString()
+
+if getgenv then
+	getgenv().StarLight_ESPLibrary = StarLight_ESPLibrary
+end
+
+return StarLight_ESPLibrary
